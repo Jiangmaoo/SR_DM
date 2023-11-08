@@ -1,7 +1,9 @@
 import os
 import torch
+from matplotlib import pyplot as plt
+
 from data import train_dataloader
-from utils import Adder, Timer
+from utils import Adder, Timer, CharbonnierLoss
 from torch.utils.tensorboard import SummaryWriter
 from valid import _valid
 import torch.nn.functional as F
@@ -10,7 +12,8 @@ from warmup_scheduler import GradualWarmupScheduler
 
 def _train(model, args):
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-    criterion = torch.nn.L1Loss()
+    # criterion = torch.nn.L1Loss()
+    criterion = CharbonnierLoss()
 
     optimizer = torch.optim.Adam(model.parameters(), lr=args.learning_rate, betas=(0.9, 0.999), eps=1e-8)
     dataloader = train_dataloader(args.data_dir, args.batch_size, args.num_worker)
@@ -37,6 +40,12 @@ def _train(model, args):
     epoch_timer = Timer('m')
     iter_timer = Timer('m')
     best_psnr=-1
+
+    iter_loss_adder = Adder()
+    epoch_pixel = []
+    epoch_fft = []
+    epoch_pnsr = []
+    Loss = []
 
     for epoch_idx in range(epoch, args.num_epoch + 1):
 
@@ -90,7 +99,7 @@ def _train(model, args):
             loss_fft = f1+f2+f3
 
             loss = loss_content + 0.1 * loss_fft + loss_content_n
-
+            iter_loss_adder(loss.item())        # 计算总损失
             loss.backward()
             torch.nn.utils.clip_grad_norm_(model.parameters(), 0.01)
             optimizer.step()
@@ -121,15 +130,50 @@ def _train(model, args):
             torch.save({'model': model.state_dict()}, save_name)
         print("EPOCH: %02d\nElapsed time: %4.2f Epoch Pixel Loss: %7.4f Epoch FFT Loss: %7.4f" % (
             epoch_idx, epoch_timer.toc(), epoch_pixel_adder.average(), epoch_fft_adder.average()))
+
+        epoch_pixel.append(epoch_pixel_adder.average())
+        epoch_fft.append(epoch_fft_adder.average())
+        Loss.append(iter_loss_adder.average())
+
         epoch_fft_adder.reset()
         epoch_pixel_adder.reset()
         scheduler.step()
         if epoch_idx % args.valid_freq == 0:
             val_its = _valid(model, args, epoch_idx)
+            epoch_pnsr.append(val_its)
             print('%03d epoch \n Average PSNR %.2f dB' % (epoch_idx, val_its))
             # writer.add_scalar('PSNR', val_its, epoch_idx)
             if val_its >= best_psnr:
                 best_psnr = val_its
                 torch.save({'model': model.state_dict()}, os.path.join(args.model_save_dir, 'Best.pkl'))
+        plot_log(
+            {
+                "loss": Loss,
+                "PLoss": epoch_pixel,
+                "FLoss": epoch_fft,
+                "PSNR": epoch_pnsr
+            },
+            str(epoch_idx)
+        )
+
     save_name = os.path.join(args.model_save_dir, 'Final.pkl')
     torch.save({'model': model.state_dict()}, save_name)
+# 损失日志
+def plot_log(data, save_model_name="model"):
+    plt.cla()
+    plt.plot(data["loss"], label="loss")
+    plt.plot(data["PLoss"], label="PLoss")
+    plt.plot(data["FLoss"], label="FLoss")
+    plt.legend()
+    plt.xlabel("epoch")
+    plt.ylabel("loss")
+    plt.title("Loss")
+    plt.savefig("./logs/" + save_model_name + "_loss" + ".png")
+
+    plt.cla()
+    plt.plot(data["PSNR"], label="PSNR")
+    plt.legend()
+    plt.xlabel("epoch")
+    plt.ylabel("psnr")
+    plt.title("PSNR")
+    plt.savefig("./logs/" + save_model_name + "_psnr" + ".png")

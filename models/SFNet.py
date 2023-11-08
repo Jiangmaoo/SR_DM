@@ -6,7 +6,7 @@ from models.layers import BasicConv, ResLayers, FAM, SCM
 
 
 class EBlock(nn.Module):
-    def __init__(self, mode, num_res=16):
+    def __init__(self, mode, num_res):
         super(EBlock, self).__init__()
         base_channel = 32
         self.feat_extract = nn.ModuleList([
@@ -44,17 +44,17 @@ class EBlock(nn.Module):
         res1 = self.FAM0(x_, res1)
         # 128*128
         z = self.feat_extract[1](res1)
-        z = self.FAM1(z, z2)
+        # z = self.FAM1(z, z2)
         res2 = self.res[1](z)
         res2 = self.FAM1(z, res2)
         # 64*64
         z = self.feat_extract[2](res2)
-        z = self.FAM2(z, z4)
+        # z = self.FAM2(z, z4)
         res3 = self.res[2](z)
         res3 = self.FAM2(z, res3)
 
         z = self.feat_extract[3](res3)
-        z = self.FAM3(z, z8)
+        # z = self.FAM3(z, z8)
         res4 = self.res[3](z)
         z = self.FAM3(z, res4)
 
@@ -75,7 +75,7 @@ class EBlock(nn.Module):
 
 
 class DBlock(nn.Module):
-    def __init__(self, mode, num_res=16):
+    def __init__(self, mode, num_res):
         super(DBlock, self).__init__()
         base_channel = 32
         self.feat_extract = nn.ModuleList([
@@ -154,7 +154,7 @@ class DBlock(nn.Module):
 
 
 class SFNet(nn.Module):
-    def __init__(self, mode, num_res=16):
+    def __init__(self, mode, num_res=4):
         super(SFNet, self).__init__()
 
         self.encoder_gt = EBlock(mode, num_res)

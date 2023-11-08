@@ -13,8 +13,8 @@ def get_parser():
     # ../dataset/
     # dataset/
     # /home/jiangmao/code/dataset/
-    parser.add_argument('--data_dir', type=str, default='')  # 到train的上层文件夹
-    parser.add_argument('--mode', type=str, default='test', choices=['train', 'test'])
+    parser.add_argument('--data_dir', type=str, default='/home/jiangmao/code/dataset/')  # 到train的上层文件夹
+    parser.add_argument('--mode', type=str, default='train', choices=['train', 'test'])
 
     # Train
     parser.add_argument('--batch_size', type=int, default=4)
@@ -26,7 +26,7 @@ def get_parser():
     parser.add_argument('--save_freq', type=int, default=10)
     parser.add_argument('--valid_freq', type=int, default=1)
     parser.add_argument('--resume', type=str, default='')#恢复模型训练的路径
-    parser.add_argument('--model_save_dir', type=str, default='result/Training-Results/')
+    parser.add_argument('--model_save_dir', type=str, default='results/Training-Results/')
 
     # Test
     parser.add_argument('--test_model', type=str, default='results/Training-Results/Best.pkl')
@@ -54,6 +54,8 @@ def main(args):
         os.makedirs((args.result_dir))
     if not os.path.exists(args.model_save_dir):
         os.makedirs(args.model_save_dir)
+    if not os.path.exists("./logs"):
+        os.mkdir("./logs")
 
     mode = args.mode
     model = build_net(mode)
